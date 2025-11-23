@@ -1,29 +1,8 @@
 // ==========================================
-// BƯỚC 1: THIẾT LẬP CẤU TRÚC REACT CƠ BẢN
+// CRUD Application with API Integration
 // ==========================================
-// - Tạo component gốc App và render vào thẻ <div id="root">
-// - Dùng React, ReactDOM, Babel qua CDN (đã thêm trong index.html)
-// - API services được load qua window.userApi (từ userApi.js)
 
-// ==========================================
-// BƯỚC 2: TỔ CHỨC COMPONENT VÀ STATE TẬP TRUNG
-// ==========================================
-// Ứng dụng gồm 4 component: App, SearchForm, AddUser, ResultTable
-// Dữ liệu và hàm setState được quản lý tại App (component cha)
-// Các component con chỉ nhận props và gọi callback để báo ngược lên
-// ==========================================
-// BƯỚC 3: CHỨC NĂNG TÌM KIẾM (SEARCHFORM)
-// ==========================================
-// Mục tiêu: truyền dữ liệu tìm kiếm từ component con → cha → ResultTable
-// - SearchForm nhận props onChangeValue (hàm setKeyword từ App)
-// - Khi người dùng gõ vào input, gọi callback để cập nhật kw trong App
-// - ResultTable nhận keyword qua props (chưa lọc dữ liệu ở bước này, chỉ hiển thị)
-
-// Input -> SearchForm -> gọi onChangeValue -> App cập nhật kw -> truyền xuống ResultTable
-
-// ---- Component 1: SearchForm ----
-// Nhận hàm onChangeValue (tức là setKeyword từ App)
-// Khi người dùng nhập từ khóa, kích hoạt callback để cập nhật kw trong App
+// Component 1: SearchForm
 function SearchForm({ onChangeValue }) {
     return (
         <input
@@ -33,13 +12,11 @@ function SearchForm({ onChangeValue }) {
         />
     );
 }
-// ---- Component 2: AddUser ----
-// BƯỚC 5: Form thêm người dùng
-// - Controlled input
-// - Tạo newUser object rồi gửi lên App bằng onAdd()
 
+// Component 2: AddUser
 function AddUser({ onAdd }) {
     const [show, setShow] = React.useState(false);
+    const [saving, setSaving] = React.useState(false);
     const [form, setForm] = React.useState({
         name: "", username: "", email: "", city: ""
     });
@@ -48,17 +25,26 @@ function AddUser({ onAdd }) {
         setForm(prev => ({ ...prev, [field]: value }));
     };
 
-    const handleAdd = () => {
-        onAdd({
-            id: Date.now(),
+    const handleAdd = async () => {
+        const payload = {
             name: form.name,
             username: form.username,
             email: form.email,
             address: { city: form.city }
-        });
+        };
 
-        setForm({ name: "", username: "", email: "", city: "" });
-        setShow(false);
+        try {
+            setSaving(true);
+            const created = await window.userApi.createUser(payload);
+            onAdd(created);
+            setForm({ name: "", username: "", email: "", city: "" });
+            setShow(false);
+        } catch (err) {
+            console.error(err);
+            alert('Tạo thất bại');
+        } finally {
+            setSaving(false);
+        }
     };
 
     return (
@@ -87,8 +73,10 @@ function AddUser({ onAdd }) {
                             onChange={e => handleChange("city", e.target.value)}
                         />
 
-                        <button onClick={handleAdd}>Lưu</button>
-                        <button onClick={() => setShow(false)}>Hủy</button>
+                        <button onClick={handleAdd} disabled={saving}>
+                            {saving ? 'Đang lưu...' : 'Lưu'}
+                        </button>
+                        <button onClick={() => setShow(false)} disabled={saving}>Hủy</button>
                     </div>
                 </div>
             )}
@@ -96,21 +84,14 @@ function AddUser({ onAdd }) {
     );
 }
 
-
-// ---- Component 3: ResultTable ----
-// BƯỚC 4: Hiển thị danh sách người dùng
-// - Fetch dữ liệu API 1 lần bằng useEffect
-// - Lưu vào state users
-// - Lọc theo keyword từ props
-// - Render bảng bằng map()
-
-function ResultTable({ keyword, user, onAdded }) {
+// Component 3: ResultTable
+function ResultTable({ keyword, user }) {
     const [users, setUsers] = React.useState([]);
     const [loading, setLoading] = React.useState(true);
     const [editing, setEditing] = React.useState(null);
+    const [saving, setSaving] = React.useState(false);
 
-
-    // 1. Tải dữ liệu 1 lần khi mount
+    // Load data on mount
     React.useEffect(() => {
         (async () => {
             try {
@@ -119,28 +100,33 @@ function ResultTable({ keyword, user, onAdded }) {
                 setUsers(data);
             } catch (err) {
                 console.error(err);
-                // set error state nếu cần
             } finally {
                 setLoading(false);
             }
         })();
     }, []);
-    // Khi có user mới từ App → thêm vào danh sách
+
+    // Add new user to list
     React.useEffect(() => {
         if (user) {
             setUsers(prev => [...prev, user]);
         }
     }, [user]);
 
-    // 2. Lọc danh sách theo keyword
-    const filteredUsers = users.filter(
-        (u) =>
-            u.name.toLowerCase().includes(keyword.toLowerCase()) ||
-            u.username.toLowerCase().includes(keyword.toLowerCase())
+    // Filter users by keyword
+    const q = (keyword || "").toLowerCase();
+    const filteredUsers = users.filter(u =>
+        (u.name || "").toLowerCase().includes(q) ||
+        (u.username || "").toLowerCase().includes(q)
     );
+
     function editUser(user) {
-        setEditing({ ...user, address: { ...user.address } });
+        setEditing({
+            ...user,
+            address: { ...(user.address || {}), city: user.address?.city || "" }
+        });
     }
+
     function handleEditChange(field, value) {
         if (field === "city") {
             setEditing(prev => ({
@@ -154,12 +140,35 @@ function ResultTable({ keyword, user, onAdded }) {
             }));
         }
     }
-    function saveUser() {
-        setUsers(prev => prev.map(u => u.id === editing.id ? editing : u));
-        setEditing(null);
+
+    async function saveUser() {
+        try {
+            setSaving(true);
+            const updated = await window.userApi.updateUser(editing.id, editing);
+            setUsers(prev => prev.map(u => u.id === updated.id ? updated : u));
+            setEditing(null);
+        } catch (err) {
+            console.error(err);
+            alert('Cập nhật thất bại');
+        } finally {
+            setSaving(false);
+        }
     }
-    function removeUser(id) {
-        setUsers(prev => prev.filter(u => u.id !== id));
+
+    async function removeUser(id) {
+        const snapshot = [...users];
+        setUsers(prev => prev.filter(u => u.id !== id)); // optimistic update
+
+        try {
+            const status = await window.userApi.deleteUser(id);
+            if (!(status >= 200 && status < 300)) {
+                throw new Error('Delete failed');
+            }
+        } catch (err) {
+            console.error(err);
+            setUsers(snapshot);
+            alert('Xóa thất bại');
+        }
     }
 
     if (loading) return <p>Đang tải dữ liệu...</p>;
@@ -197,12 +206,13 @@ function ResultTable({ keyword, user, onAdded }) {
                             placeholder="City"
                         />
 
-                        <button onClick={saveUser}>Lưu</button>
-                        <button onClick={() => setEditing(null)}>Hủy</button>
+                        <button onClick={saveUser} disabled={saving}>
+                            {saving ? 'Đang lưu...' : 'Lưu'}
+                        </button>
+                        <button onClick={() => setEditing(null)} disabled={saving}>Hủy</button>
                     </div>
                 </div>
             )}
-
 
             <table border="1" cellPadding="5">
                 <thead>
@@ -222,12 +232,10 @@ function ResultTable({ keyword, user, onAdded }) {
                             <td>{u.name}</td>
                             <td>{u.username}</td>
                             <td>{u.email}</td>
-                            <td>{u.address.city}</td>
+                            <td>{u.address?.city || '-'}</td>
                             <td>
                                 <button onClick={() => editUser(u)}>Sửa</button>
-
                                 <button onClick={() => removeUser(u.id)}>Xóa</button>
-
                             </td>
                         </tr>
                     ))}
@@ -237,17 +245,14 @@ function ResultTable({ keyword, user, onAdded }) {
     );
 }
 
-// ---- Component gốc: App ----
-// Quản lý toàn bộ state và truyền props xuống các component con
+// Main App Component
 function App() {
     const [kw, setKeyword] = React.useState("");
-    // lưu user mới thêm
     const [newUser, setNewUser] = React.useState(null);
 
     const handleAddUser = (user) => {
         setNewUser(user);
     };
-
 
     return (
         <div>
@@ -255,10 +260,10 @@ function App() {
             <SearchForm onChangeValue={setKeyword} />
             <AddUser onAdd={handleAddUser} />
             <ResultTable keyword={kw} user={newUser} />
-
         </div>
     );
 }
-// ---- Render toàn bộ ứng dụng ----
+
+// Render App
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(<App />);
