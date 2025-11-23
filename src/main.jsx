@@ -1,4 +1,9 @@
 // ==========================================
+// IMPORT API SERVICES
+// ==========================================
+import { getUsers, createUser, updateUser, deleteUser } from './services/userApi.js';
+
+// ==========================================
 // BƯỚC 1: THIẾT LẬP CẤU TRÚC REACT CƠ BẢN
 // ==========================================
 // - Tạo component gốc App và render vào thẻ <div id="root">
@@ -111,12 +116,18 @@ function ResultTable({ keyword, user, onAdded }) {
 
     // 1. Tải dữ liệu 1 lần khi mount
     React.useEffect(() => {
-        fetch("https://jsonplaceholder.typicode.com/users")
-            .then(res => res.json())
-            .then(data => {
+        (async () => {
+            try {
+                setLoading(true);
+                const data = await getUsers();
                 setUsers(data);
+            } catch (err) {
+                console.error(err);
+                // set error state nếu cần
+            } finally {
                 setLoading(false);
-            });
+            }
+        })();
     }, []);
     // Khi có user mới từ App → thêm vào danh sách
     React.useEffect(() => {
