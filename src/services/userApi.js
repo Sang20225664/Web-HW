@@ -5,22 +5,25 @@ const api = axios.create({
     headers: { 'Content-Type': 'application/json' }
 });
 
-export async function getUsers() {
-    const res = await api.get('/users');
-    return res.data;
-}
+// Tạo object global thay vì export
+window.userApi = {
+    async getUsers() {
+        const res = await api.get('/users');
+        return res.data;
+    },
 
-export async function createUser(payload) {
-    const res = await api.post('/users', payload);
-    return res.data;
-}
+    async createUser(payload) {
+        const res = await api.post('/users', payload);
+        return res.data;
+    },
 
-export async function updateUser(id, payload) {
-    const res = await api.patch(`/users/${id}`, payload);
-    return res.data;
-}
+    async updateUser(id, payload) {
+        const res = await api.patch(`/users/${id}`, payload);
+        return res.data;
+    },
 
-export async function deleteUser(id) {
-    const res = await api.delete(`/users/${id}`);
-    return res.status;
-}
+    async deleteUser(id) {
+        const res = await api.delete(`/users/${id}`);
+        return res.status;
+    }
+};

@@ -1,13 +1,9 @@
 // ==========================================
-// IMPORT API SERVICES
-// ==========================================
-import { getUsers, createUser, updateUser, deleteUser } from './services/userApi.js';
-
-// ==========================================
 // BƯỚC 1: THIẾT LẬP CẤU TRÚC REACT CƠ BẢN
 // ==========================================
 // - Tạo component gốc App và render vào thẻ <div id="root">
 // - Dùng React, ReactDOM, Babel qua CDN (đã thêm trong index.html)
+// - API services được load qua window.userApi (từ userApi.js)
 
 // ==========================================
 // BƯỚC 2: TỔ CHỨC COMPONENT VÀ STATE TẬP TRUNG
@@ -119,7 +115,7 @@ function ResultTable({ keyword, user, onAdded }) {
         (async () => {
             try {
                 setLoading(true);
-                const data = await getUsers();
+                const data = await window.userApi.getUsers();
                 setUsers(data);
             } catch (err) {
                 console.error(err);
