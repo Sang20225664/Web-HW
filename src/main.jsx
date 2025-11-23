@@ -90,6 +90,8 @@ function ResultTable({ keyword, user }) {
     const [loading, setLoading] = React.useState(true);
     const [editing, setEditing] = React.useState(null);
     const [saving, setSaving] = React.useState(false);
+    const [currentPage, setCurrentPage] = React.useState(1);
+    const pageSize = 5;
 
     // Load data on mount
     React.useEffect(() => {
@@ -119,6 +121,17 @@ function ResultTable({ keyword, user }) {
         (u.name || "").toLowerCase().includes(q) ||
         (u.username || "").toLowerCase().includes(q)
     );
+
+    // Pagination logic
+    const totalPages = Math.ceil(filteredUsers.length / pageSize);
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
+
+    // Reset to page 1 when filter changes
+    React.useEffect(() => {
+        setCurrentPage(1);
+    }, [keyword]);
 
     function editUser(user) {
         setEditing({
@@ -226,7 +239,7 @@ function ResultTable({ keyword, user }) {
                     </tr>
                 </thead>
                 <tbody>
-                    {filteredUsers.map((u) => (
+                    {paginatedUsers.map((u) => (
                         <tr key={u.id}>
                             <td>{u.id}</td>
                             <td>{u.name}</td>
@@ -241,6 +254,28 @@ function ResultTable({ keyword, user }) {
                     ))}
                 </tbody>
             </table>
+
+            {/* Pagination Controls */}
+            <div style={{ marginTop: '20px', display: 'flex', gap: '10px', alignItems: 'center', justifyContent: 'center' }}>
+                <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                >
+                    ← Trước
+                </button>
+
+                <span>
+                    Trang {currentPage} / {totalPages || 1}
+                    {filteredUsers.length > 0 && ` (${filteredUsers.length} kết quả)`}
+                </span>
+
+                <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages || totalPages === 0}
+                >
+                    Tiếp →
+                </button>
+            </div>
         </div>
     );
 }
